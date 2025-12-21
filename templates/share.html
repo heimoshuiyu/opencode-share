@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opencode Share - {{share_id}}</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="description" content="opencode - The AI coding agent built for the terminal.">
+    <script>
+        window.SHARE_ID = "{{share_id}}";
+    </script>
+    <script src="/static/share.js" defer></script>
+    <link rel="stylesheet" href="/static/share.css">
+</head>
+<body>
+    <div id="app">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Loading share...</p>
+        </div>
+    </div>
+    
+    <div id="error-container" style="display: none;">
+        <div class="error-content">
+            <h1>Share Not Found</h1>
+            <p>The share you're looking for doesn't exist or has been removed.</p>
+            <a href="/">Go Home</a>
+        </div>
+    </div>
+</body>
+</html>
