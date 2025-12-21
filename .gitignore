@@ -1,0 +1,6 @@
+/.git
+/target
+/.env
+/opencode-share.db
+/opencode-share.db-wal
+/opencode-share.db-shm
