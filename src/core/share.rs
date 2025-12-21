@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use chrono::Utc;
 use serde_json;
 use sqlx::SqlitePool;
-use tracing::{debug, error};
+use tracing::error;
 use uuid::Uuid;
 
 pub struct ShareService {
@@ -52,7 +52,6 @@ impl ShareService {
         .fetch_one(&self.pool)
         .await?;
 
-        debug!("Created share: {} for session: {}", share.id, share.session_id);
         Ok(share)
     }
 
@@ -81,7 +80,6 @@ impl ShareService {
             .execute(&self.pool)
             .await?;
 
-        debug!("Removed share: {}", id);
         Ok(())
     }
 
@@ -112,13 +110,10 @@ impl ShareService {
         .execute(&self.pool)
         .await?;
 
-        debug!("Synced {} data items to share: {}", data.len(), share_id);
         Ok(())
     }
 
     pub async fn get_data(&self, share_id: &str) -> Result<Vec<ShareData>> {
-        debug!("Reading compaction for share: {}", share_id);
-        
         // Get current compaction
         let compaction = sqlx::query_as::<_, ShareCompaction>(
             "SELECT share_id, event_key, data, updated_at FROM share_compactions WHERE share_id = ?"
@@ -138,7 +133,6 @@ impl ShareService {
         };
 
         // Get pending events
-        debug!("Reading pending events for share: {}", share_id);
         let last_event_key = compaction.as_ref().and_then(|c| c.event_key.clone());
         
         let events = if let Some(ref key) = last_event_key {
@@ -157,8 +151,6 @@ impl ShareService {
             .fetch_all(&self.pool)
             .await?
         };
-
-        debug!("Compacting {} events for share: {}", events.len(), share_id);
 
         if !events.is_empty() {
             // Process events and update result
