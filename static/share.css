@@ -289,6 +289,75 @@ body {
   font-size: inherit;
 }
 
+/* Tool input/output specific styles */
+.message-content .tool-input,
+.message-content .tool-output {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.message-content .tool-input {
+  background-color: var(--background-stronger);
+  border: 1px solid var(--border-weak-base);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.message-content .tool-output {
+  background-color: var(--background-stronger);
+  border: 1px solid var(--border-weak-base);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+/* Tool command and description styles */
+.message-content .tool-command {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 0.9em;
+  background-color: var(--background-strong);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--text-base);
+}
+
+.message-content .tool-description {
+  font-style: italic;
+  color: var(--text-weaker);
+  margin-left: 8px;
+}
+
+/* Tool metadata styles */
+.message-content .tool-title {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.message-content .tool-status {
+  background-color: var(--background-strong);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 0.875rem;
+  color: var(--text-weaker);
+}
+
+.message-content .tool-exit-code {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 0.875rem;
+}
+
+.message-content .tool-duration {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 0.875rem;
+}
+
 .diff-container {
   padding: 24px;
   background-color: var(--background-base);
