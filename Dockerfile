@@ -25,6 +25,7 @@ RUN cargo build --release && rm -rf src
 COPY src ./src/
 COPY migrations ./migrations/
 COPY static ./static/
+COPY templates ./templates/
 
 # Build the application
 RUN touch src/main.rs && cargo build --release
@@ -41,6 +42,7 @@ COPY --from=builder /app/target/release/opencode-share ./opencode-share
 # Copy migrations and static files
 COPY --from=builder /app/migrations ./migrations/
 COPY --from=builder /app/static ./static/
+COPY --from=builder /app/templates ./templates/
 
 # Expose port
 EXPOSE 3006

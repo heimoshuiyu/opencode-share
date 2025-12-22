@@ -117,34 +117,59 @@ class ShareRenderer {
             content += part.text + '\n\n';
           }
           break;
-          
+
         case 'reasoning':
           if (part.text && part.text.trim()) {
-            content += `🤔 **Reasoning:**\n${part.text}\n\n`;
+            const reasoningId = `reasoning-${Math.random().toString(36).substr(2, 9)}`;
+            const isLongReasoning = part.text.trim().split('\n').length > 5;
+
+            content += `<div class="reasoning-block" id="${reasoningId}">`;
+            content += `<div class="reasoning-header">`;
+            content += `<span class="reasoning-icon">🤔</span>`;
+            content += `<span class="reasoning-title">Thinking Process</span>`;
+            if (isLongReasoning) {
+              content += `<button class="reasoning-toggle" onclick="toggleReasoning('${reasoningId}')">`;
+              content += `<span class="show-text">Show details</span>`;
+              content += `<span class="hide-text" style="display:none">Hide</span>`;
+              content += `</button>`;
+            }
+            content += `</div>`;
+
+            if (isLongReasoning) {
+              content += `<div class="reasoning-content collapsible" style="display:none;">`;
+              content += `<pre><code>${this.escapeHtml(part.text.trim())}</code></pre>`;
+              content += `</div>`;
+            } else {
+              content += `<div class="reasoning-content">`;
+              content += `<pre><code>${this.escapeHtml(part.text.trim())}</code></pre>`;
+              content += `</div>`;
+            }
+
+            content += `</div>`;
           }
           break;
-          
+
         case 'tool':
         case 'tool-call':
           if (part.state) {
             const toolInfo = this.formatToolCall(part.state);
-            content += `🔧 **Tool Call:** ${toolInfo}\n\n`;
+            content += toolInfo;
           }
           break;
-          
+
         case 'step-start':
-          content += `🚀 **Step Started**\n\n`;
+          content += `<div class="step-marker step-start">🚀 Step Started</div>\n\n`;
           break;
-          
+
         case 'step-finish':
           if (part.tokens) {
             const tokenInfo = this.formatTokenUsage(part.tokens);
-            content += `✅ **Step Completed** ${tokenInfo}\n\n`;
+            content += `<div class="step-marker step-complete">✅ Step Completed ${tokenInfo}</div>\n\n`;
           } else {
-            content += `✅ **Step Completed**\n\n`;
+            content += `<div class="step-marker step-complete">✅ Step Completed</div>\n\n`;
           }
           break;
-          
+
         default:
           // Handle unknown part types
           if (part.text) {
@@ -156,48 +181,100 @@ class ShareRenderer {
     return content.trim() || `[${message.role || 'unknown'} message - no content]`;
   }
   
-  // Format tool call information
+  // Format tool call information with enhanced styling
   formatToolCall(state) {
     const title = state.title || state.metadata?.description || 'Unknown Tool';
     const status = state.status || 'unknown';
-    
-    let result = `**${title}** (${status})\n`;
-    
+
+    // Generate a unique ID for this tool call
+    const toolId = `tool-${Math.random().toString(36).substr(2, 9)}`;
+    const hasOutput = state.output && state.output.trim();
+    const outputLines = hasOutput ? state.output.trim().split('\n').length : 0;
+    const isLongOutput = outputLines > 10;
+
+    let result = `<div class="tool-call" data-status="${status}">`;
+    result += `<div class="tool-header">`;
+    result += `<span class="tool-icon">🔧</span>`;
+    result += `<span class="tool-title">${this.escapeHtml(title)}</span>`;
+    result += `<span class="tool-status status-${status}">${this.escapeHtml(status)}</span>`;
+    result += `</div>`;
+
+    // Tool details section
+    result += `<div class="tool-details">`;
+
     // Add input
     if (state.input) {
+      result += `<div class="tool-input">`;
+      result += `<div class="tool-label">Input</div>`;
       if (typeof state.input === 'string') {
-        result += `**Input:** ${state.input}\n`;
+        result += `<code class="tool-inline-code">${this.escapeHtml(state.input)}</code>`;
       } else if (state.input.command) {
-        result += `**Command:** \`${state.input.command}\`\n`;
+        result += `<div class="tool-command">`;
+        result += `<span class="prompt">$</span>`;
+        result += `<code>${this.escapeHtml(state.input.command)}</code>`;
+        result += `</div>`;
         if (state.input.description) {
-          result += `**Description:** ${state.input.description}\n`;
+          result += `<div class="tool-description">${this.escapeHtml(state.input.description)}</div>`;
         }
       } else {
-        result += `**Input:** \`${JSON.stringify(state.input)}\`\n`;
+        result += `<pre class="tool-json"><code>${this.escapeHtml(JSON.stringify(state.input, null, 2))}</code></pre>`;
       }
+      result += `</div>`;
     }
-    
-    // Add output
-    if (state.output && state.output.trim()) {
-      result += `**Output:**\n\`\`\`\n${state.output}\n\`\`\`\n`;
+
+    // Add output with collapsible functionality
+    if (hasOutput) {
+      const outputClass = isLongOutput ? 'tool-output tool-output-collapsible' : 'tool-output';
+      const preview = isLongOutput ? state.output.trim().split('\n').slice(0, 5).join('\n') : state.output.trim();
+      const fullOutput = state.output.trim();
+
+      result += `<div class="${outputClass}" id="${toolId}">`;
+      result += `<div class="tool-label">Output`;
+
+      if (isLongOutput) {
+        result += `<button class="tool-expand-btn" onclick="this.closest('.tool-output').classList.toggle('expanded')">`;
+        result += `<span class="expand-text">Show full output (${outputLines} lines)</span>`;
+        result += `<span class="collapse-text">Show less</span>`;
+        result += `</button>`;
+      }
+
+      result += `</div>`;
+
+      if (isLongOutput) {
+        result += `<div class="output-preview"><pre><code>${this.escapeHtml(preview)}</code></pre></div>`;
+        result += `<div class="output-full" style="display:none;"><pre><code>${this.escapeHtml(fullOutput)}</code></pre></div>`;
+      } else {
+        result += `<pre><code>${this.escapeHtml(fullOutput)}</code></pre>`;
+      }
+
+      result += `</div>`;
     }
-    
-    // Add metadata
+
+    // Add metadata (exit code, duration, etc.)
+    const metadata = [];
     if (state.metadata && state.metadata.exit !== undefined) {
-      result += `**Exit Code:** ${state.metadata.exit}\n`;
+      const exitCode = state.metadata.exit;
+      const exitClass = exitCode === 0 ? 'exit-success' : 'exit-error';
+      metadata.push(`<span class="${exitClass}">Exit: ${exitCode}</span>`);
     }
-    
-    // Add timing
+
     if (state.time) {
       const start = state.time.start;
       const end = state.time.end;
       if (start && end) {
         const duration = end - start;
-        result += `**Duration:** ${duration}ms\n`;
+        metadata.push(`<span class="tool-duration">⏱ ${duration}ms</span>`);
       }
     }
-    
-    return result.trim();
+
+    if (metadata.length > 0) {
+      result += `<div class="tool-metadata">${metadata.join(' • ')}</div>`;
+    }
+
+    result += `</div>`; // Close tool-details
+    result += `</div>`; // Close tool-call
+
+    return result;
   }
   
   // Format token usage information
@@ -298,7 +375,10 @@ class ShareRenderer {
     const model = message.modelID || '';
     const timestamp = message.time ? new Date(message.time.created).toLocaleString() : '';
     const tokens = message.tokens || {};
-    
+
+    // Check if content contains HTML (tool calls)
+    const hasHtml = content.includes('<div class="tool-call"');
+
     return `
       <div class="message">
         <div class="message-header">
@@ -308,13 +388,13 @@ class ShareRenderer {
             <span class="message-time">${timestamp}</span>
             ${tokens.input || tokens.output ? `
               <span class="message-tokens">
-                ${tokens.input ? `📥 ${tokens.input}` : ''} 
+                ${tokens.input ? `📥 ${tokens.input}` : ''}
                 ${tokens.output ? `📤 ${tokens.output}` : ''}
               </span>
             ` : ''}
           </div>
         </div>
-        <div class="message-content">${this.escapeHtml(content)}</div>
+        <div class="message-content ${hasHtml ? 'has-rich-content' : ''}">${hasHtml ? content : this.escapeHtml(content)}</div>
       </div>
     `;
   }
@@ -396,6 +476,25 @@ class ShareRenderer {
         <a href="/">Go Home</a>
       </div>
     `;
+  }
+}
+
+// Global function for toggling reasoning blocks
+function toggleReasoning(id) {
+  const block = document.getElementById(id);
+  const button = block.querySelector('.reasoning-toggle');
+  const content = block.querySelector('.reasoning-content');
+  const showText = button.querySelector('.show-text');
+  const hideText = button.querySelector('.hide-text');
+
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    showText.style.display = 'none';
+    hideText.style.display = 'inline';
+  } else {
+    content.style.display = 'none';
+    showText.style.display = 'inline';
+    hideText.style.display = 'none';
   }
 }
 
