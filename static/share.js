@@ -152,7 +152,7 @@ class ShareRenderer {
         case 'tool':
         case 'tool-call':
           if (part.state) {
-            const toolInfo = this.formatToolCall(part.state);
+            const toolInfo = this.formatToolCall(part.state, part.tool);
             content += toolInfo;
           }
           break;
@@ -182,17 +182,22 @@ class ShareRenderer {
   }
   
   // Format tool call information with enhanced styling
-  formatToolCall(state) {
-    // Try multiple possible fields for tool name
+  formatToolCall(state, toolName = null) {
+    // The tool type (bash, grep, view, write, read, etc.) should come from the part's tool field
+    const tool = toolName ||
+                 state.toolType ||
+                 state.tool ||
+                 state.type ||
+                 'unknown';
+
+    // The title is a descriptive description of what this specific call does
     const title = state.title ||
                   state.name ||
-                  state.tool ||
-                  state.toolName ||
-                  state.metadata?.name ||
-                  state.metadata?.toolName ||
-                  state.metadata?.title ||
+                  state.description ||
                   state.metadata?.description ||
-                  'Unknown Tool';
+                  state.input?.description ||
+                  '';
+
     const status = state.status || 'unknown';
 
     // Generate a unique ID for this tool call
@@ -204,7 +209,7 @@ class ShareRenderer {
     let result = `<div class="tool-call" data-status="${status}">`;
     result += `<div class="tool-header">`;
     result += `<span class="tool-icon">🔧</span>`;
-    result += `<span class="tool-title">${this.escapeHtml(title)}</span>`;
+    result += `<span class="tool-title">${this.escapeHtml(tool)}${title ? ` - ${this.escapeHtml(title)}` : ''}</span>`;
     result += `<span class="tool-status status-${status}">${this.escapeHtml(status)}</span>`;
     result += `</div>`;
 
