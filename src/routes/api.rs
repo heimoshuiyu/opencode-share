@@ -34,8 +34,7 @@ pub async fn create_share(
     headers: HeaderMap,
     Json(request): Json<CreateShareRequest>,
 ) -> Result<Json<CreateShareResponse>, StatusCode> {
-    // 提取客户端信息用于详细日志
-    let client_ip = get_client_info(&headers);
+    // Removed client IP extraction
     let user_agent = headers
         .get("user-agent")
         .and_then(|h| h.to_str().ok())
@@ -43,9 +42,8 @@ pub async fn create_share(
     
     let session_id = request.session_id.clone();
     info!(
-        "🆕 Creating share - SessionID: {} - IP: {} - User-Agent: {}",
+        "🆕 Creating share - SessionID: {} - User-Agent: {}",
         session_id,
-        client_ip,
         user_agent
     );
     
@@ -69,8 +67,8 @@ pub async fn create_share(
             let url = format!("{protocol}://{host}/share/{}", share.id);
             
             info!(
-                "✅ Share created successfully - ID: {} - URL: {} - IP: {}",
-                share.id, url, client_ip
+                "✅ Share created successfully - ID: {} - URL: {}",
+                share.id, url
             );
             
             Ok(Json(CreateShareResponse {
@@ -81,8 +79,8 @@ pub async fn create_share(
         }
         Err(e) => {
             error!(
-                "❌ Failed to create share - SessionID: {} - Error: {} - IP: {}",
-                session_id, e, client_ip
+                 "❌ Failed to create share - SessionID: {} - Error: {}",
+                 session_id, e
             );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
@@ -92,16 +90,14 @@ pub async fn create_share(
 pub async fn sync_share(
     State(state): State<AppState>,
     Path(share_id): Path<String>,
-    headers: HeaderMap,
     Json(request): Json<SyncShareRequest>,
 ) -> Result<(), StatusCode> {
-    // 提取客户端信息用于详细日志
-    let client_ip = get_client_info(&headers);
+    // Removed client IP extraction
     let data_size = request.data.len();
     
     info!(
-        "🔄 Syncing data to share - ID: {} - Data size: {} items - IP: {}",
-        share_id, data_size, client_ip
+        "🔄 Syncing data to share - ID: {} - Data size: {} items",
+        share_id, data_size
     );
     
     let share_service = ShareService::new(state.db.clone());
@@ -109,15 +105,15 @@ pub async fn sync_share(
     match share_service.sync(&share_id, &request.secret, request.data).await {
         Ok(_) => {
             info!(
-                "✅ Successfully synced data to share - ID: {} - Data items: {} - IP: {}",
-                share_id, data_size, client_ip
+                "✅ Successfully synced data to share - ID: {} - Data items: {}",
+                share_id, data_size
             );
             Ok(())
         }
         Err(e) => {
             error!(
-                "❌ Failed to sync share - ID: {} - Error: {} - IP: {}",
-                share_id, e, client_ip
+                 "❌ Failed to sync share - ID: {} - Error: {}",
+                 share_id, e
             );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
@@ -127,14 +123,12 @@ pub async fn sync_share(
 pub async fn get_share_data(
     State(state): State<AppState>,
     Path(share_id): Path<String>,
-    headers: HeaderMap,
 ) -> Result<Json<Vec<ShareData>>, StatusCode> {
-    // 提取客户端信息用于详细日志
-    let client_ip = get_client_info(&headers);
+    // Removed client IP extraction
     
     info!(
-        "📖 Retrieving share data - ID: {} - IP: {}",
-        share_id, client_ip
+        "📖 Retrieving share data - ID: {}",
+        share_id
     );
     
     let share_service = ShareService::new(state.db.clone());
@@ -142,16 +136,16 @@ pub async fn get_share_data(
     match share_service.get_data(&share_id).await {
         Ok(data) => {
             info!(
-                "✅ Retrieved share data - ID: {} - Data items: {} - IP: {}",
-                share_id, data.len(), client_ip
+                "✅ Retrieved share data - ID: {} - Data items: {}",
+                share_id, data.len()
             );
             debug!("Share {} data preview: {:?}", share_id, data);
             Ok(Json(data))
         }
         Err(e) => {
             error!(
-                "❌ Failed to get share data - ID: {} - Error: {} - IP: {}",
-                share_id, e, client_ip
+                 "❌ Failed to get share data - ID: {} - Error: {}",
+                 share_id, e
             );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
@@ -161,15 +155,13 @@ pub async fn get_share_data(
 pub async fn remove_share(
     State(state): State<AppState>,
     Path(share_id): Path<String>,
-    headers: HeaderMap,
     Json(request): Json<RemoveShareRequest>,
 ) -> Result<(), StatusCode> {
-    // 提取客户端信息用于详细日志
-    let client_ip = get_client_info(&headers);
+    // Removed client IP extraction
     
     info!(
-        "🗑️ Removing share - ID: {} - IP: {}",
-        share_id, client_ip
+        "🗑️ Removing share - ID: {}",
+        share_id
     );
     
     let share_service = ShareService::new(state.db.clone());
@@ -177,45 +169,18 @@ pub async fn remove_share(
     match share_service.remove(&share_id, &request.secret).await {
         Ok(_) => {
             info!(
-                "✅ Successfully removed share - ID: {} - IP: {}",
-                share_id, client_ip
+                "✅ Successfully removed share - ID: {}",
+                share_id
             );
             Ok(())
         }
         Err(e) => {
             error!(
-                "❌ Failed to remove share - ID: {} - Error: {} - IP: {}",
-                share_id, e, client_ip
+                 "❌ Failed to remove share - ID: {} - Error: {}",
+                 share_id, e
             );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
 
-/// 从请求头中提取客户端IP地址
-fn get_client_info(headers: &HeaderMap) -> String {
-    // 尝试从各种头部获取真实IP
-    headers
-        .get("x-forwarded-for")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|h| h.to_str().ok())
-        })
-        .or_else(|| {
-            headers
-                .get("cf-connecting-ip") // Cloudflare
-                .and_then(|h| h.to_str().ok())
-        })
-        .or_else(|| {
-            headers
-                .get("x-client-ip")
-                .and_then(|h| h.to_str().ok())
-        })
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "Unknown".to_string())
-}

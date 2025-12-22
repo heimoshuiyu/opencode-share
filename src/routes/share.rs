@@ -21,16 +21,15 @@ pub async fn share_page(
     Path(share_id): Path<String>,
     headers: HeaderMap,
 ) -> Result<Html<String>, StatusCode> {
-    // 提取客户端信息用于详细日志
-    let client_ip = get_client_info(&headers);
+    // Removed client IP extraction
     let user_agent = headers
         .get("user-agent")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("Unknown");
     
     info!(
-        "🌐 Share page request - ID: {} - IP: {} - User-Agent: {}",
-        share_id, client_ip, user_agent
+        "🌐 Share page request - ID: {}",
+        share_id
     );
     
     let share_service = ShareService::new(state.db.clone());
@@ -39,8 +38,8 @@ pub async fn share_page(
     match share_service.get(&share_id).await {
         Ok(Some(_share)) => {
             info!(
-                "✅ Share page rendered successfully - ID: {} - IP: {}",
-                share_id, client_ip
+                "✅ Share page rendered successfully - ID: {}",
+                share_id
             );
             
             // Return HTML page using template
@@ -49,15 +48,15 @@ pub async fn share_page(
         }
         Ok(None) => {
             warn!(
-                "⚠️ Share not found - ID: {} - IP: {} - User-Agent: {}",
-                share_id, client_ip, user_agent
+                "⚠️ Share not found - ID: {} - User-Agent: {}",
+                share_id, user_agent
             );
             Err(StatusCode::NOT_FOUND)
         }
         Err(e) => {
             error!(
-                "❌ Error checking share - ID: {} - Error: {} - IP: {}",
-                share_id, e, client_ip
+                 "❌ Error checking share - ID: {} - Error: {}",
+                 share_id, e
             );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
@@ -80,30 +79,3 @@ fn generate_share_page(share_id: &str) -> Result<String, StatusCode> {
     Ok(html)
 }
 
-/// 从请求头中提取客户端IP地址
-fn get_client_info(headers: &HeaderMap) -> String {
-    // 尝试从各种头部获取真实IP
-    headers
-        .get("x-forwarded-for")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|h| h.to_str().ok())
-        })
-        .or_else(|| {
-            headers
-                .get("cf-connecting-ip") // Cloudflare
-                .and_then(|h| h.to_str().ok())
-        })
-        .or_else(|| {
-            headers
-                .get("x-client-ip")
-                .and_then(|h| h.to_str().ok())
-        })
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "Unknown".to_string())
-}
