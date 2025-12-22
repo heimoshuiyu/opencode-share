@@ -5,7 +5,6 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use serde::Deserialize;
 use tracing::{debug, error, info};
 
 use crate::{
@@ -16,10 +15,7 @@ use crate::{
     AppState,
 };
 
-#[derive(Debug, Deserialize)]
-pub struct ShareQuery {
-    sessionID: String,
-}
+
 
 pub fn api_routes() -> Router<AppState> {
     Router::new()

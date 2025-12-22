@@ -16,12 +16,7 @@ impl ShareService {
     }
 
     pub async fn create(&self, session_id: String) -> Result<Share> {
-        let is_test = session_id.starts_with("test_");
-        let id = if is_test {
-            format!("test_{}", &session_id[session_id.len().saturating_sub(8)..])
-        } else {
-            session_id[session_id.len().saturating_sub(8)..].to_string()
-        };
+        let id = session_id.clone();
         
         let secret = Uuid::new_v4().to_string();
 
