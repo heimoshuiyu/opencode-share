@@ -2,16 +2,16 @@ use crate::models::{Share, ShareData, ShareEvent, ShareCompaction};
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use serde_json;
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use tracing::error;
 use uuid::Uuid;
 
 pub struct ShareService {
-    pool: SqlitePool,
+    pool: PgPool,
 }
 
 impl ShareService {
-    pub fn new(pool: SqlitePool) -> Self {
+    pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -27,7 +27,7 @@ impl ShareService {
 
         // Check if share already exists
         let existing = sqlx::query_as::<_, Share>(
-            "SELECT id, secret, session_id, created_at FROM shares WHERE id = ?"
+            "SELECT id, secret, session_id, created_at FROM shares WHERE id = $1"
         )
         .bind(&id)
         .fetch_optional(&self.pool)
@@ -41,7 +41,7 @@ impl ShareService {
         let share = sqlx::query_as::<_, Share>(
             r#"
             INSERT INTO shares (id, secret, session_id, created_at)
-            VALUES (?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4)
             RETURNING id, secret, session_id, created_at
             "#
         )
@@ -57,7 +57,7 @@ impl ShareService {
 
     pub async fn get(&self, id: &str) -> Result<Option<Share>> {
         let share = sqlx::query_as::<_, Share>(
-            "SELECT id, secret, session_id, created_at FROM shares WHERE id = ?"
+            "SELECT id, secret, session_id, created_at FROM shares WHERE id = $1"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -75,7 +75,7 @@ impl ShareService {
         }
 
         // Delete share (cascades to events and compactions)
-        sqlx::query("DELETE FROM shares WHERE id = ?")
+        sqlx::query("DELETE FROM shares WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -100,7 +100,7 @@ impl ShareService {
         sqlx::query(
             r#"
             INSERT INTO share_events (share_id, event_key, data, created_at)
-            VALUES (?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4)
             "#
         )
         .bind(share_id)
@@ -116,7 +116,7 @@ impl ShareService {
     pub async fn get_data(&self, share_id: &str) -> Result<Vec<ShareData>> {
         // Get current compaction
         let compaction = sqlx::query_as::<_, ShareCompaction>(
-            "SELECT share_id, event_key, data, updated_at FROM share_compactions WHERE share_id = ?"
+            "SELECT share_id, event_key, data, updated_at FROM share_compactions WHERE share_id = $1"
         )
         .bind(share_id)
         .fetch_optional(&self.pool)
@@ -137,7 +137,7 @@ impl ShareService {
         
         let events = if let Some(ref key) = last_event_key {
             sqlx::query_as::<_, ShareEvent>(
-                "SELECT id, share_id, event_key, data, created_at FROM share_events WHERE share_id = ? AND event_key > ? ORDER BY event_key ASC"
+                "SELECT id, share_id, event_key, data, created_at FROM share_events WHERE share_id = $1 AND event_key > $2 ORDER BY event_key ASC"
             )
             .bind(share_id)
             .bind(key)
@@ -145,7 +145,7 @@ impl ShareService {
             .await?
         } else {
             sqlx::query_as::<_, ShareEvent>(
-                "SELECT id, share_id, event_key, data, created_at FROM share_events WHERE share_id = ? ORDER BY event_key ASC"
+                "SELECT id, share_id, event_key, data, created_at FROM share_events WHERE share_id = $1 ORDER BY event_key ASC"
             )
             .bind(share_id)
             .fetch_all(&self.pool)
@@ -175,7 +175,7 @@ impl ShareService {
             sqlx::query(
                 r#"
                 INSERT INTO share_compactions (share_id, event_key, data, updated_at)
-                VALUES (?, ?, ?, ?)
+                VALUES ($1, $2, $3, $4)
                 ON CONFLICT(share_id) DO UPDATE SET
                     event_key = excluded.event_key,
                     data = excluded.data,

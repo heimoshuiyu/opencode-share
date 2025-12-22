@@ -3,7 +3,7 @@ use axum::{
     routing::get,
     Router,
 };
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
@@ -18,7 +18,7 @@ use middleware::access_log_middleware;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: SqlitePool,
+    pub db: PgPool,
 }
 
 #[tokio::main]
@@ -36,14 +36,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize database
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| {
-            let current_dir = std::env::current_dir().unwrap();
-            let db_path = current_dir.join("opencode-share.db");
-            format!("sqlite:{}", db_path.display())
-        });
+        .unwrap_or_else(|_| "postgres://postgres@localhost/opencode_share".to_string());
     
     println!("Using database: {}", database_url);
-    let pool = SqlitePool::connect(&database_url).await?;
+    let pool = PgPool::connect(&database_url).await?;
     
     // Run migrations
     sqlx::migrate!("./migrations")

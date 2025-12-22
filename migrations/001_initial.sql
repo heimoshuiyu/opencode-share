@@ -3,16 +3,16 @@ CREATE TABLE IF NOT EXISTS shares (
     id TEXT PRIMARY KEY,
     secret TEXT NOT NULL,
     session_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create share_events table for event sourcing
 CREATE TABLE IF NOT EXISTS share_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     share_id TEXT NOT NULL,
     event_key TEXT NOT NULL,
     data TEXT NOT NULL, -- JSON string
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (share_id) REFERENCES shares(id) ON DELETE CASCADE
 );
 
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS share_compactions (
     share_id TEXT PRIMARY KEY,
     event_key TEXT, -- The last event key included in compaction
     data TEXT NOT NULL, -- JSON array of ShareData
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (share_id) REFERENCES shares(id) ON DELETE CASCADE
 );
 

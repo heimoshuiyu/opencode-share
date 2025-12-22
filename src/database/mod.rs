@@ -1,20 +1,13 @@
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use std::sync::Arc;
 
-pub type DbPool = Arc<SqlitePool>;
+pub type DbPool = Arc<PgPool>;
 
-pub async fn create_pool(database_url: &str) -> anyhow::Result<SqlitePool> {
-    let pool = SqlitePool::connect(database_url).await?;
+pub async fn create_pool(database_url: &str) -> anyhow::Result<PgPool> {
+    let pool = PgPool::connect(database_url).await?;
     
-    // Enable foreign key constraints
-    sqlx::query("PRAGMA foreign_keys = ON")
-        .execute(&pool)
-        .await?;
-    
-    // Enable WAL mode for better concurrency
-    sqlx::query("PRAGMA journal_mode = WAL")
-        .execute(&pool)
-        .await?;
+    // PostgreSQL has foreign key constraints enabled by default
+    // and doesn't need WAL mode like SQLite
     
     Ok(pool)
 }
