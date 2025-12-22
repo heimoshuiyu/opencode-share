@@ -161,30 +161,30 @@ class ShareRenderer {
     const title = state.title || state.metadata?.description || 'Unknown Tool';
     const status = state.status || 'unknown';
     
-    let result = `<span class="tool-title">${this.escapeHtml(title)}</span> <span class="tool-status">(${this.escapeHtml(status)})</span>\n`;
+    let result = `**${title}** (${status})\n`;
     
     // Add input
     if (state.input) {
       if (typeof state.input === 'string') {
-        result += `**Input:** <div class="tool-input">${this.escapeHtml(state.input)}</div>\n`;
+        result += `**Input:** ${state.input}\n`;
       } else if (state.input.command) {
-        result += `**Command:** <span class="tool-command">${this.escapeHtml(state.input.command)}</span>\n`;
+        result += `**Command:** \`${state.input.command}\`\n`;
         if (state.input.description) {
-          result += `**Description:** <span class="tool-description">${state.input.description}</span>\n`;
+          result += `**Description:** ${state.input.description}\n`;
         }
       } else {
-        result += `**Input:** <div class="tool-input">${this.escapeHtml(JSON.stringify(state.input, null, 2))}</div>\n`;
+        result += `**Input:** \`${JSON.stringify(state.input)}\`\n`;
       }
     }
     
     // Add output
     if (state.output && state.output.trim()) {
-      result += `**Output:**\n<div class="tool-output">${this.escapeHtml(state.output)}</div>\n`;
+      result += `**Output:**\n\`\`\`\n${state.output}\n\`\`\`\n`;
     }
     
     // Add metadata
     if (state.metadata && state.metadata.exit !== undefined) {
-      result += `**Exit Code:** <span class="tool-exit-code">${state.metadata.exit}</span>\n`;
+      result += `**Exit Code:** ${state.metadata.exit}\n`;
     }
     
     // Add timing
@@ -193,7 +193,7 @@ class ShareRenderer {
       const end = state.time.end;
       if (start && end) {
         const duration = end - start;
-        result += `**Duration:** <span class="tool-duration">${duration}ms</span>\n`;
+        result += `**Duration:** ${duration}ms\n`;
       }
     }
     
