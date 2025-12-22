@@ -183,7 +183,16 @@ class ShareRenderer {
   
   // Format tool call information with enhanced styling
   formatToolCall(state) {
-    const title = state.title || state.metadata?.description || 'Unknown Tool';
+    // Try multiple possible fields for tool name
+    const title = state.title ||
+                  state.name ||
+                  state.tool ||
+                  state.toolName ||
+                  state.metadata?.name ||
+                  state.metadata?.toolName ||
+                  state.metadata?.title ||
+                  state.metadata?.description ||
+                  'Unknown Tool';
     const status = state.status || 'unknown';
 
     // Generate a unique ID for this tool call
