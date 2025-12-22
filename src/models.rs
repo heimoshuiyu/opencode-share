@@ -7,8 +7,7 @@ pub struct Share {
     pub id: String,
     pub secret: String,
     pub session_id: String,
-    pub events: Option<Value>, // JSONB field stored as serde_json::Value
-    pub compacted_data: Option<Value>, // JSONB field for optional compaction
+    pub data: Option<Value>, // JSONB field storing current state as array
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
