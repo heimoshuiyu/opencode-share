@@ -390,8 +390,8 @@ class ShareRenderer {
     const timestamp = message.time ? new Date(message.time.created).toLocaleString() : '';
     const tokens = message.tokens || {};
 
-    // Check if content contains HTML (tool calls)
-    const hasHtml = content.includes('<div class="tool-call"');
+    // Check if content contains HTML (tool calls, reasoning blocks, step markers)
+    const hasHtml = content.includes('<div class="') || content.includes('<div class="reasoning-block"') || content.includes('<div class="step-marker"');
 
     return `
       <div class="message">
