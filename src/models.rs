@@ -1,12 +1,23 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Share {
     pub id: String,
     pub secret: String,
     pub session_id: String,
+    pub events: Option<Value>, // JSONB field stored as serde_json::Value
+    pub compacted_data: Option<Value>, // JSONB field for optional compaction
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShareEvent {
+    pub event_key: String,
+    #[serde(flatten)]
+    pub data: ShareData,
     pub created_at: DateTime<Utc>,
 }
 
@@ -14,32 +25,15 @@ pub struct Share {
 #[serde(tag = "type")]
 pub enum ShareData {
     #[serde(rename = "session")]
-    Session { data: serde_json::Value },
+    Session { data: Value },
     #[serde(rename = "message")]
-    Message { data: serde_json::Value },
+    Message { data: Value },
     #[serde(rename = "part")]
-    Part { data: serde_json::Value },
+    Part { data: Value },
     #[serde(rename = "session_diff")]
-    SessionDiff { data: serde_json::Value },
+    SessionDiff { data: Value },
     #[serde(rename = "model")]
-    Model { data: serde_json::Value },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ShareEvent {
-    pub id: i64,
-    pub share_id: String,
-    pub event_key: String,
-    pub data: String, // JSON string
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ShareCompaction {
-    pub share_id: String,
-    pub event_key: Option<String>,
-    pub data: String, // JSON string
-    pub updated_at: DateTime<Utc>,
+    Model { data: Value },
 }
 
 // Create share request
@@ -61,6 +55,18 @@ pub struct CreateShareResponse {
 #[derive(Debug, Deserialize)]
 pub struct SyncShareRequest {
     pub secret: String,
+    pub data: Vec<ShareData>,
+}
+
+// Sync share response
+#[derive(Debug, Serialize)]
+pub struct SyncShareResponse {
+    pub data: Vec<ShareData>,
+}
+
+// Get share response
+#[derive(Debug, Serialize)]
+pub struct GetShareResponse {
     pub data: Vec<ShareData>,
 }
 

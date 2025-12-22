@@ -1,7 +1,7 @@
-use crate::models::{Share, ShareData, ShareEvent, ShareCompaction};
+use crate::models::{Share, ShareData};
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use serde_json;
+use serde_json::{json, Value};
 use sqlx::PgPool;
 use tracing::error;
 use uuid::Uuid;
@@ -17,12 +17,11 @@ impl ShareService {
 
     pub async fn create(&self, session_id: String) -> Result<Share> {
         let id = session_id.clone();
-        
         let secret = Uuid::new_v4().to_string();
 
         // Check if share already exists
         let existing = sqlx::query_as::<_, Share>(
-            "SELECT id, secret, session_id, created_at FROM shares WHERE id = $1"
+            "SELECT id, secret, session_id, events, compacted_data, created_at, updated_at FROM shares WHERE id = $1"
         )
         .bind(&id)
         .fetch_optional(&self.pool)
@@ -32,17 +31,19 @@ impl ShareService {
             return Err(anyhow!("Share already exists: {}", id));
         }
 
-        // Create new share
+        // Create new share with empty events array
         let share = sqlx::query_as::<_, Share>(
             r#"
-            INSERT INTO shares (id, secret, session_id, created_at)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, secret, session_id, created_at
+            INSERT INTO shares (id, secret, session_id, events, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, secret, session_id, events, compacted_data, created_at, updated_at
             "#
         )
         .bind(&id)
         .bind(&secret)
         .bind(&session_id)
+        .bind(json!([])) // Empty events array
+        .bind(Utc::now())
         .bind(Utc::now())
         .fetch_one(&self.pool)
         .await?;
@@ -52,7 +53,7 @@ impl ShareService {
 
     pub async fn get(&self, id: &str) -> Result<Option<Share>> {
         let share = sqlx::query_as::<_, Share>(
-            "SELECT id, secret, session_id, created_at FROM shares WHERE id = $1"
+            "SELECT id, secret, session_id, events, compacted_data, created_at, updated_at FROM shares WHERE id = $1"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -69,7 +70,7 @@ impl ShareService {
             return Err(anyhow!("Share secret invalid: {}", id));
         }
 
-        // Delete share (cascades to events and compactions)
+        // Delete share (single table operation)
         sqlx::query("DELETE FROM shares WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -86,21 +87,40 @@ impl ShareService {
             return Err(anyhow!("Share secret invalid: {}", share_id));
         }
 
-        // Generate event key for ordering
-        let event_key = format!("event_{}", Uuid::new_v4());
-        
-        // Insert event data
-        let data_json = serde_json::to_string(&data)?;
-        
+        // Convert ShareData to ShareEvent
+        let new_events: Vec<Value> = data.into_iter().map(|share_data| {
+            let event_key = format!("event_{}", Uuid::new_v4());
+            json!({
+                "event_key": event_key,
+                "type": match &share_data {
+                    ShareData::Session { .. } => "session",
+                    ShareData::Message { .. } => "message",
+                    ShareData::Part { .. } => "part",
+                    ShareData::SessionDiff { .. } => "session_diff",
+                    ShareData::Model { .. } => "model",
+                },
+                "data": match share_data {
+                    ShareData::Session { data } => data,
+                    ShareData::Message { data } => data,
+                    ShareData::Part { data } => data,
+                    ShareData::SessionDiff { data } => data,
+                    ShareData::Model { data } => data,
+                },
+                "created_at": Utc::now().to_rfc3339()
+            })
+        }).collect();
+
+        // Append new events to existing events array
         sqlx::query(
             r#"
-            INSERT INTO share_events (share_id, event_key, data, created_at)
-            VALUES ($1, $2, $3, $4)
+            UPDATE shares 
+            SET events = events || $2::jsonb,
+                updated_at = $3
+            WHERE id = $1
             "#
         )
         .bind(share_id)
-        .bind(&event_key)
-        .bind(data_json)
+        .bind(Value::Array(new_events))
         .bind(Utc::now())
         .execute(&self.pool)
         .await?;
@@ -109,83 +129,100 @@ impl ShareService {
     }
 
     pub async fn get_data(&self, share_id: &str) -> Result<Vec<ShareData>> {
-        // Get current compaction
-        let compaction = sqlx::query_as::<_, ShareCompaction>(
-            "SELECT share_id, event_key, data, updated_at FROM share_compactions WHERE share_id = $1"
-        )
-        .bind(share_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let share = self.get(share_id).await?;
+        let share = share.ok_or_else(|| anyhow!("Share not found: {}", share_id))?;
 
-        let mut result = match &compaction {
-            Some(comp) => {
-                serde_json::from_str::<Vec<ShareData>>(&comp.data).unwrap_or_else(|e| {
-                    error!("Failed to parse compaction data: {}", e);
-                    vec![]
-                })
+        // Try to get compacted data first (if available)
+        if let Some(compact_data) = share.compacted_data {
+            if let Some(data_array) = compact_data.as_array() {
+                let mut result = Vec::new();
+                for item in data_array {
+                    if let Ok(share_data) = serde_json::from_value::<ShareData>(item.clone()) {
+                        result.push(share_data);
+                    }
+                }
+                return Ok(result);
             }
-            None => vec![],
-        };
+        }
 
-        // Get pending events
-        let last_event_key = compaction.as_ref().and_then(|c| c.event_key.clone());
+        // Fallback to processing events
+        let events_value = share.events.unwrap_or(json!([]));
         
-        let events = if let Some(ref key) = last_event_key {
-            sqlx::query_as::<_, ShareEvent>(
-                "SELECT id, share_id, event_key, data, created_at FROM share_events WHERE share_id = $1 AND event_key > $2 ORDER BY event_key ASC"
-            )
-            .bind(share_id)
-            .bind(key)
-            .fetch_all(&self.pool)
-            .await?
-        } else {
-            sqlx::query_as::<_, ShareEvent>(
-                "SELECT id, share_id, event_key, data, created_at FROM share_events WHERE share_id = $1 ORDER BY event_key ASC"
-            )
-            .bind(share_id)
-            .fetch_all(&self.pool)
-            .await?
-        };
+        if let Some(events) = events_value.as_array() {
+            let mut result = Vec::new();
+            
+            for event in events {
+                // Extract ShareData from event
+                let share_data: Result<ShareData, String> = if let Some(event_type) = event.get("type").and_then(|v| v.as_str()) {
+                    match event_type {
+                        "session" => Ok(ShareData::Session { 
+                            data: event.get("data").cloned().unwrap_or(json!({})) 
+                        }),
+                        "message" => Ok(ShareData::Message { 
+                            data: event.get("data").cloned().unwrap_or(json!({})) 
+                        }),
+                        "part" => Ok(ShareData::Part { 
+                            data: event.get("data").cloned().unwrap_or(json!({})) 
+                        }),
+                        "session_diff" => Ok(ShareData::SessionDiff { 
+                            data: event.get("data").cloned().unwrap_or(json!({})) 
+                        }),
+                        "model" => Ok(ShareData::Model { 
+                            data: event.get("data").cloned().unwrap_or(json!({})) 
+                        }),
+                        _ => {
+                            error!("Unknown event type: {}", event_type);
+                            Err(format!("Unknown event type: {}", event_type))
+                        }
+                    }
+                } else {
+                    error!("Event missing type field");
+                    Err("Event missing type field".to_string())
+                };
 
-        if !events.is_empty() {
-            // Process events and update result
-            for event in &events {
-                let event_data: Vec<ShareData> = serde_json::from_str(&event.data)
-                    .unwrap_or_else(|e| {
+                match share_data {
+                    Ok(data) => {
+                        let key = self.get_data_key(&data);
+                        self.merge_data(&mut result, data, &key);
+                    }
+                    Err(e) => {
                         error!("Failed to parse event data: {}", e);
-                        vec![]
-                    });
-
-                // Merge event data with result (similar to binary search and replace logic)
-                for item in event_data {
-                    let key = self.get_data_key(&item);
-                    self.merge_data(&mut result, item, &key);
+                        continue;
+                    }
                 }
             }
 
-            // Update compaction
-            let compaction_data = serde_json::to_string(&result)?;
-            let last_event_key = events.last().map(|e| e.event_key.clone());
+            // Optional: Update compaction if we have enough events
+            if result.len() > 10 {
+                if let Err(e) = self.update_compaction(share_id, &result).await {
+                    error!("Failed to update compaction: {}", e);
+                }
+            }
 
-            sqlx::query(
-                r#"
-                INSERT INTO share_compactions (share_id, event_key, data, updated_at)
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT(share_id) DO UPDATE SET
-                    event_key = excluded.event_key,
-                    data = excluded.data,
-                    updated_at = excluded.updated_at
-                "#
-            )
-            .bind(share_id)
-            .bind(last_event_key)
-            .bind(compaction_data)
-            .bind(Utc::now())
-            .execute(&self.pool)
-            .await?;
+            Ok(result)
+        } else {
+            Ok(vec![])
         }
+    }
 
-        Ok(result)
+    async fn update_compaction(&self, share_id: &str, data: &[ShareData]) -> Result<()> {
+        let compacted_json = serde_json::to_value(data)?;
+        
+        sqlx::query(
+            r#"
+            UPDATE shares 
+            SET compacted_data = $2,
+                updated_at = $3
+            WHERE id = $1
+            "#
+        )
+        .bind(share_id)
+        .bind(compacted_json)
+        .bind(Utc::now())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     fn get_data_key(&self, data: &ShareData) -> String {
@@ -210,7 +247,6 @@ impl ShareService {
 
     fn merge_data(&self, result: &mut Vec<ShareData>, item: ShareData, key: &str) {
         // Simple linear search and replace/insert
-        // In a production system, you might want a more efficient approach
         if let Some(index) = result.iter().position(|existing| self.get_data_key(existing) == key) {
             result[index] = item;
         } else {
