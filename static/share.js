@@ -414,51 +414,130 @@ class ShareRenderer {
   }
 
   renderDiff(diff) {
-    const lines = this.formatDiff(diff);
-    
+    const result = this.formatDiff(diff);
+    const diffId = `diff-${Math.random().toString(36).substr(2, 9)}`;
+
     return `
-      <div class="diff-file">
-        <div class="diff-file-name">${this.escapeHtml(diff.file)}</div>
+      <div class="diff-file" data-diff-id="${diffId}">
+        <div class="diff-file-name">
+          ${this.escapeHtml(diff.file)}
+          <span class="diff-stats">
+            +${result.addedCount} -${result.removedCount}
+          </span>
+        </div>
         <div class="diff-content">
-          <pre>${lines.map(line => 
-            `<div class="diff-line-${line.type}">${this.escapeHtml(line.content)}</div>`
-          ).join('')}</pre>
+          <div class="diff-split-view">
+            <div class="diff-side diff-before">
+              <div class="diff-side-header">Before</div>
+              <div class="diff-side-content diff-scrollable" id="${diffId}-before">
+                ${result.beforeHtml}
+              </div>
+            </div>
+            <div class="diff-divider"></div>
+            <div class="diff-side diff-after">
+              <div class="diff-side-header">After</div>
+              <div class="diff-side-content diff-scrollable" id="${diffId}-after">
+                ${result.afterHtml}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     `;
   }
 
   formatDiff(diff) {
-    // Simple diff formatting - in a real implementation, you'd use a proper diff library
-    const lines = [];
-    
+    let beforeHtml = '';
+    let afterHtml = '';
+    let addedCount = 0;
+    let removedCount = 0;
+
     if (diff.before && diff.after) {
       const beforeLines = diff.before.split('\n');
       const afterLines = diff.after.split('\n');
-      
-      // This is a very simplified diff view
-      const maxLines = Math.max(beforeLines.length, afterLines.length);
-      
-      for (let i = 0; i < maxLines; i++) {
-        const beforeLine = beforeLines[i];
-        const afterLine = afterLines[i];
-        
-        if (beforeLine === afterLine) {
-          if (beforeLine !== undefined) {
-            lines.push({ type: 'unchanged', content: ` ${beforeLine}` });
-          }
-        } else if (beforeLine === undefined) {
-          lines.push({ type: 'added', content: `+${afterLine}` });
-        } else if (afterLine === undefined) {
-          lines.push({ type: 'removed', content: `-${beforeLine}` });
-        } else {
-          lines.push({ type: 'removed', content: `-${beforeLine}` });
-          lines.push({ type: 'added', content: `+${afterLine}` });
+
+      // Use diff library to compute actual differences
+      const diffResult = window.Diff.diffLines(diff.before, diff.after, {
+        newlineIsToken: false,
+        ignoreWhitespace: false,
+        oneChangePerToken: false
+      });
+
+      let beforeLineNumber = 1;
+      let afterLineNumber = 1;
+
+      diffResult.forEach(change => {
+        if (!change.removed && !change.added) {
+          // Unchanged lines
+          const lines = change.value.split('\n');
+          // Remove last empty element if exists
+          if (lines[lines.length - 1] === '') lines.pop();
+
+          lines.forEach(line => {
+            if (line !== '') {
+              beforeHtml += `
+                <div class="diff-row unchanged">
+                  <div class="diff-line-num">${beforeLineNumber++}</div>
+                  <div class="diff-cell">${this.escapeHtml(line)}</div>
+                </div>
+              `;
+              afterHtml += `
+                <div class="diff-row unchanged">
+                  <div class="diff-line-num">${afterLineNumber++}</div>
+                  <div class="diff-cell">${this.escapeHtml(line)}</div>
+                </div>
+              `;
+            }
+          });
+        } else if (change.removed) {
+          // Lines only exist in before (removed)
+          const lines = change.value.split('\n');
+          if (lines[lines.length - 1] === '') lines.pop();
+
+          lines.forEach(line => {
+            if (line !== '') {
+              beforeHtml += `
+                <div class="diff-row removed">
+                  <div class="diff-line-num">${beforeLineNumber++}</div>
+                  <div class="diff-cell">${this.escapeHtml(line)}</div>
+                </div>
+              `;
+              afterHtml += `
+                <div class="diff-row empty">
+                  <div class="diff-line-num"></div>
+                  <div class="diff-cell">&nbsp;</div>
+                </div>
+              `;
+              removedCount++;
+            }
+          });
+        } else if (change.added) {
+          // Lines only exist in after (added)
+          const lines = change.value.split('\n');
+          if (lines[lines.length - 1] === '') lines.pop();
+
+          lines.forEach(line => {
+            if (line !== '') {
+              beforeHtml += `
+                <div class="diff-row empty">
+                  <div class="diff-line-num"></div>
+                  <div class="diff-cell">&nbsp;</div>
+                </div>
+              `;
+              afterHtml += `
+                <div class="diff-row added">
+                  <div class="diff-line-num">${afterLineNumber++}</div>
+                  <div class="diff-cell">${this.escapeHtml(line)}</div>
+                </div>
+              `;
+              addedCount++;
+            }
+          });
         }
-      }
+      });
     }
-    
-    return lines;
+
+    return { beforeHtml, afterHtml, addedCount, removedCount };
   }
 
   escapeHtml(text) {
@@ -473,6 +552,24 @@ class ShareRenderer {
     messageElements.forEach(element => {
       element.addEventListener('click', () => {
         // Handle message selection if needed
+      });
+    });
+
+    // Add synchronized scrolling for diff views
+    const diffScrollables = document.querySelectorAll('.diff-scrollable');
+    diffScrollables.forEach(scrollable => {
+      scrollable.addEventListener('scroll', (e) => {
+        const id = e.target.id;
+        const beforeElement = document.getElementById(id.replace('-after', '-before'));
+        const afterElement = document.getElementById(id.replace('-before', '-after'));
+
+        // Find the paired element
+        const pairedElement = id.includes('-before') ? afterElement : beforeElement;
+
+        if (pairedElement && pairedElement !== e.target) {
+          // Sync scroll position
+          pairedElement.scrollTop = e.target.scrollTop;
+        }
       });
     });
   }

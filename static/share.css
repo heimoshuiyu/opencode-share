@@ -318,16 +318,297 @@ body {
   border-bottom: 1px solid var(--border-weak-base);
   font-family: monospace;
   font-size: 0.875rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diff-stats {
+  font-size: 0.75rem;
+  color: var(--text-weaker);
+}
+
+.diff-stats::before {
+  content: ' ';
 }
 
 .diff-content {
-  padding: 12px;
+  padding: 0;
+  background-color: var(--background-base);
+}
+
+.diff-split-view {
+  display: flex;
+  border-top: 1px solid var(--border-weak-base);
+  background-color: var(--background-base);
+}
+
+.diff-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.diff-side-header {
+  padding: 8px 12px;
+  background-color: var(--background-strong);
+  border-bottom: 1px solid var(--border-weak-base);
   font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-weaker);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diff-side-content {
+  flex: 1;
+  overflow: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 0.8125rem;
-  line-height: 1.4;
+  line-height: 1.6;
+}
+
+.diff-side-content .diff-row {
+  border-bottom: 1px solid var(--border-weak-base);
+  min-height: 1.6em;
+}
+
+.diff-divider {
+  width: 1px;
+  background-color: var(--border-weak-base);
+  flex-shrink: 0;
+}
+
+.diff-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-weak-base);
+  min-height: 1.6em;
+}
+
+.diff-row:last-child {
+  border-bottom: none;
+}
+
+.diff-row.unchanged {
+  background-color: transparent;
+  color: var(--text-weaker);
+}
+
+.diff-row.unchanged:hover {
+  background-color: var(--background-strong);
+}
+
+.diff-row.removed {
+  background-color: #ffebe9;
+}
+
+.diff-row.removed:hover {
+  background-color: #ffdce0;
+}
+
+.diff-row.added {
+  background-color: #e6ffec;
+}
+
+.diff-row.added:hover {
+  background-color: #ccffd8;
+}
+
+.diff-row.empty {
+  background-color: transparent;
+}
+
+.diff-row.empty:hover {
+  background-color: transparent;
+}
+
+.diff-line-num {
+  min-width: 50px;
+  text-align: right;
+  padding: 0 10px 0 12px;
+  color: var(--text-weaker);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  user-select: none;
+  flex-shrink: 0;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.diff-cell {
+  flex: 1;
+  padding: 0 8px;
+  white-space: pre;
+  overflow-x: auto;
+  min-width: 0;
+  line-height: 1.6;
+}
+
+.diff-row.empty .diff-cell {
+  background-color: transparent;
+}
+
+.diff-line {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-weak-base);
+  min-height: 1.6em;
+}
+
+.diff-line:last-child {
+  border-bottom: none;
+}
+
+.diff-line-number {
+  min-width: 50px;
+  text-align: right;
+  padding-right: 10px;
+  color: var(--text-weaker);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.diff-marker {
+  min-width: 20px;
+  text-align: center;
+  color: var(--text-weaker);
+  font-weight: bold;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.diff-text {
+  flex: 1;
+  white-space: pre;
   overflow-x: auto;
 }
 
+.diff-line.added {
+  background-color: #e6ffec;
+}
+
+.diff-line.added .diff-marker {
+  color: #22863a;
+}
+
+.diff-line.removed {
+  background-color: #ffebe9;
+}
+
+.diff-line.removed .diff-marker {
+  color: #cb2431;
+}
+
+.diff-line.unchanged {
+  background-color: transparent;
+}
+
+.diff-line.unchanged .diff-marker {
+  color: transparent;
+}
+
+.diff-line.modified {
+  display: block;
+  background-color: #fbf3db;
+}
+
+.diff-line.modified .diff-line-old {
+  background-color: rgba(247, 232, 194, 0.3);
+}
+
+.diff-line.modified .diff-line-new {
+  background-color: rgba(222, 246, 229, 0.3);
+}
+
+.diff-line-old {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.diff-line-old .diff-marker {
+  color: #cb2431;
+}
+
+.diff-line-new {
+  display: flex;
+  align-items: stretch;
+}
+
+.diff-line-new .diff-marker {
+  color: #22863a;
+}
+
+.diff-line-modified {
+  display: block;
+  background-color: #fbf3db;
+}
+
+.diff-line-old {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.diff-line-old .diff-marker {
+  color: #cb2431;
+}
+
+.diff-line-new {
+  display: flex;
+  align-items: stretch;
+}
+
+.diff-line-new .diff-marker {
+  color: #22863a;
+}
+
+.diff-context-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: var(--background-strong);
+  color: var(--text-weaker);
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border-weak-base);
+  user-select: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.diff-context-summary:hover {
+  background-color: var(--background-stronger);
+}
+
+.diff-context-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background-color: var(--background-strong);
+  color: var(--text-weaker);
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border-weak-base);
+  user-select: none;
+}
+
+.diff-line-unchanged {
+  background-color: transparent;
+  color: var(--text-weaker);
+  padding: 2px 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.diff-line-unchanged .diff-line-number {
+  color: #d0d7de;
+}
+
+/* Legacy styles for backward compatibility */
 .diff-line-added {
   background-color: #e6ffed;
   color: #24292e;
@@ -336,10 +617,6 @@ body {
 .diff-line-removed {
   background-color: #ffeef0;
   color: #24292e;
-}
-
-.diff-line-unchanged {
-  background-color: transparent;
 }
 
 .no-scrollbar {
