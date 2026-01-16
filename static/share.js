@@ -118,36 +118,37 @@ class ShareRenderer {
           }
           break;
 
-        case 'reasoning':
-          if (part.text && part.text.trim()) {
-            const reasoningId = `reasoning-${Math.random().toString(36).substr(2, 9)}`;
-            const isLongReasoning = part.text.trim().split('\n').length > 5;
+         case 'reasoning':
+           if (part.text && part.text.trim()) {
+             const reasoningId = `reasoning-${Math.random().toString(36).substr(2, 9)}`;
+             const isLongReasoning = part.text.trim().split('\n').length > 5;
+             const safeText = this.escapeHtml(part.text.trim());
 
-            content += `<div class="reasoning-block" id="${reasoningId}">`;
-            content += `<div class="reasoning-header">`;
-            content += `<span class="reasoning-icon">🤔</span>`;
-            content += `<span class="reasoning-title">Thinking Process</span>`;
-            if (isLongReasoning) {
-              content += `<button class="reasoning-toggle" onclick="toggleReasoning('${reasoningId}')">`;
-              content += `<span class="show-text">Show details</span>`;
-              content += `<span class="hide-text" style="display:none">Hide</span>`;
-              content += `</button>`;
-            }
-            content += `</div>`;
+             content += `<div class="reasoning-block" id="${reasoningId}">`;
+             content += `<div class="reasoning-header">`;
+             content += `<span class="reasoning-icon">🤔</span>`;
+             content += `<span class="reasoning-title">Thinking Process</span>`;
+             if (isLongReasoning) {
+               content += `<button class="reasoning-toggle" onclick="toggleReasoning('${reasoningId}')">`;
+               content += `<span class="show-text">Show details</span>`;
+               content += `<span class="hide-text" style="display:none">Hide</span>`;
+               content += `</button>`;
+             }
+             content += `</div>`;
 
-            if (isLongReasoning) {
-              content += `<div class="reasoning-content collapsible" style="display:none;">`;
-              content += `<pre><code>${this.escapeHtml(part.text.trim())}</code></pre>`;
-              content += `</div>`;
-            } else {
-              content += `<div class="reasoning-content">`;
-              content += `<pre><code>${this.escapeHtml(part.text.trim())}</code></pre>`;
-              content += `</div>`;
-            }
+             if (isLongReasoning) {
+               content += `<div class="reasoning-content collapsible" style="display:none;">`;
+               content += `<pre><code>${safeText}</code></pre>`;
+               content += `</div>`;
+             } else {
+               content += `<div class="reasoning-content">`;
+               content += `<pre><code>${safeText}</code></pre>`;
+               content += `</div>`;
+             }
 
-            content += `</div>`;
-          }
-          break;
+             content += `</div>`;
+           }
+           break;
 
         case 'tool':
         case 'tool-call':
@@ -170,13 +171,15 @@ class ShareRenderer {
           }
           break;
 
-        default:
-          // Handle unknown part types
-          if (part.text) {
-            content += `📝 **${part.type}:**\n${part.text}\n\n`;
-          }
-      }
-    }
+         default:
+           // Handle unknown part types
+           if (part.text) {
+             const safeType = this.escapeHtml(part.type);
+             const safeText = this.escapeHtml(part.text);
+             content += `📝 **${safeType}:**\n${safeText}\n\n`;
+           }
+       }
+     }
     
     return content.trim() || `[${message.role || 'unknown'} message - no content]`;
   }
@@ -206,11 +209,15 @@ class ShareRenderer {
     const outputLines = hasOutput ? state.output.trim().split('\n').length : 0;
     const isLongOutput = outputLines > 10;
 
-    let result = `<div class="tool-call" data-status="${status}">`;
+    const safeTool = this.escapeHtml(tool);
+    const safeTitle = title ? this.escapeHtml(title) : '';
+    const safeStatus = this.escapeHtml(status);
+
+    let result = `<div class="tool-call" data-status="${safeStatus}">`;
     result += `<div class="tool-header">`;
     result += `<span class="tool-icon">🔧</span>`;
-    result += `<span class="tool-title">${this.escapeHtml(tool)}${title ? ` - ${this.escapeHtml(title)}` : ''}</span>`;
-    result += `<span class="tool-status status-${status}">${this.escapeHtml(status)}</span>`;
+    result += `<span class="tool-title">${safeTool}${safeTitle ? ` - ${safeTitle}` : ''}</span>`;
+    result += `<span class="tool-status status-${safeStatus}">${safeStatus}</span>`;
     result += `</div>`;
 
     // Tool details section
@@ -241,6 +248,8 @@ class ShareRenderer {
       const outputClass = isLongOutput ? 'tool-output tool-output-collapsible' : 'tool-output';
       const preview = isLongOutput ? state.output.trim().split('\n').slice(0, 5).join('\n') : state.output.trim();
       const fullOutput = state.output.trim();
+      const safePreview = this.escapeHtml(preview);
+      const safeFullOutput = this.escapeHtml(fullOutput);
 
       result += `<div class="${outputClass}" id="${toolId}">`;
       result += `<div class="tool-label">Output`;
@@ -255,10 +264,10 @@ class ShareRenderer {
       result += `</div>`;
 
       if (isLongOutput) {
-        result += `<div class="output-preview"><pre><code>${this.escapeHtml(preview)}</code></pre></div>`;
-        result += `<div class="output-full" style="display:none;"><pre><code>${this.escapeHtml(fullOutput)}</code></pre></div>`;
+        result += `<div class="output-preview"><pre><code>${safePreview}</code></pre></div>`;
+        result += `<div class="output-full" style="display:none;"><pre><code>${safeFullOutput}</code></pre></div>`;
       } else {
-        result += `<pre><code>${this.escapeHtml(fullOutput)}</code></pre>`;
+        result += `<pre><code>${safeFullOutput}</code></pre>`;
       }
 
       result += `</div>`;
@@ -393,6 +402,9 @@ class ShareRenderer {
     // Check if content contains HTML (tool calls, reasoning blocks, step markers)
     const hasHtml = content.includes('<div class="') || content.includes('<div class="reasoning-block"') || content.includes('<div class="step-marker"');
 
+    // Sanitize HTML if present, otherwise escape plain text
+    const safeContent = hasHtml ? this.sanitizeHtml(content) : this.escapeHtml(content);
+
     return `
       <div class="message">
         <div class="message-header">
@@ -408,7 +420,7 @@ class ShareRenderer {
             ` : ''}
           </div>
         </div>
-        <div class="message-content ${hasHtml ? 'has-rich-content' : ''}">${hasHtml ? content : this.escapeHtml(content)}</div>
+        <div class="message-content ${hasHtml ? 'has-rich-content' : ''}">${safeContent}</div>
       </div>
     `;
   }
@@ -538,6 +550,46 @@ class ShareRenderer {
     }
 
     return { beforeHtml, afterHtml, addedCount, removedCount };
+  }
+
+  // Create safe HTML content - sanitize to prevent XSS
+  sanitizeHtml(unsafeHtml) {
+    const div = document.createElement('div');
+    div.innerHTML = unsafeHtml;
+
+    // Remove dangerous elements and attributes
+    const dangerousTags = ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
+    const dangerousAttrs = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur', 'onchange'];
+
+    // Remove script tags and their content
+    const scripts = div.querySelectorAll('script');
+    scripts.forEach(script => script.remove());
+
+    // Remove other dangerous tags
+    dangerousTags.forEach(tag => {
+      const elements = div.querySelectorAll(tag);
+      elements.forEach(el => el.remove());
+    });
+
+    // Remove dangerous attributes from all elements
+    const allElements = div.querySelectorAll('*');
+    allElements.forEach(el => {
+      dangerousAttrs.forEach(attr => {
+        el.removeAttribute(attr);
+      });
+    });
+
+    // Also check inline event handlers in style attribute
+    allElements.forEach(el => {
+      if (el.getAttribute('style')) {
+        const style = el.getAttribute('style');
+        if (style && style.includes('expression(')) {
+          el.removeAttribute('style');
+        }
+      }
+    });
+
+    return div.innerHTML;
   }
 
   escapeHtml(text) {

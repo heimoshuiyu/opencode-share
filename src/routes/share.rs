@@ -65,17 +65,25 @@ pub async fn share_page(
 
 fn generate_share_page(share_id: &str) -> Result<String, StatusCode> {
     let template_path = PathBuf::from("templates/share.html");
-    
+
     // Read HTML template file
     let template_content = fs::read_to_string(template_path)
         .map_err(|e| {
             error!("Failed to read HTML template: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    
-    // Replace {{share_id}} placeholder with actual share_id
-    let html = template_content.replace("{{share_id}}", share_id);
-    
+
+    // HTML escape the share_id to prevent XSS
+    let escaped_share_id = share_id
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;");
+
+    // Replace {{share_id}} placeholder with escaped share_id
+    let html = template_content.replace("{{share_id}}", &escaped_share_id);
+
     Ok(html)
 }
 
