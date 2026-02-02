@@ -1245,6 +1245,7 @@ dependencies = [
  "chrono",
  "config",
  "dotenv",
+ "hyper 1.8.1",
  "reqwest",
  "serde",
  "serde_json",
