@@ -1,8 +1,12 @@
-use crate::models::{Share, ShareData};
+use crate::models::Share;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use serde_json::json;
+use serde_json::{json, Value};
 use sqlx::PgPool;
+
+/// Default key used when client doesn't provide a `_key` field.
+/// Uses a UUID to ensure each item is treated as unique (append-only).
+const DEFAULT_KEY_PREFIX: &str = "auto";
 
 pub struct ShareService {
     pool: PgPool,
@@ -77,7 +81,7 @@ impl ShareService {
         Ok(())
     }
 
-    pub async fn sync(&self, share_id: &str, secret: &str, incoming_data: Vec<ShareData>) -> Result<()> {
+    pub async fn sync(&self, share_id: &str, secret: &str, incoming_data: Vec<Value>) -> Result<()> {
         let share = self.get(share_id).await?;
         let share = share.ok_or_else(|| anyhow!("Share not found: {}", share_id))?;
         
@@ -87,15 +91,8 @@ impl ShareService {
 
         // Get current data
         let current_data_value = share.data.unwrap_or(json!([]));
-        let mut current_data: Vec<ShareData> = if let Some(data_array) = current_data_value.as_array() {
-            data_array.iter()
-                .filter_map(|item| {
-                    match serde_json::from_value::<ShareData>(item.clone()) {
-                        Ok(data) => Some(data),
-                        Err(_) => None
-                    }
-                })
-                .collect()
+        let mut current_data: Vec<Value> = if let Some(data_array) = current_data_value.as_array() {
+            data_array.clone()
         } else {
             Vec::new()
         };
@@ -126,50 +123,38 @@ impl ShareService {
         Ok(())
     }
 
-    pub async fn get_data(&self, share_id: &str) -> Result<Vec<ShareData>> {
+    pub async fn get_data(&self, share_id: &str) -> Result<Vec<Value>> {
         let share = self.get(share_id).await?;
         let share = share.ok_or_else(|| anyhow!("Share not found: {}", share_id))?;
 
         // Simply return the stored data
         if let Some(data_value) = share.data {
             if let Some(data_array) = data_value.as_array() {
-                return Ok(data_array.iter()
-                    .filter_map(|item| {
-                        match serde_json::from_value::<ShareData>(item.clone()) {
-                            Ok(data) => Some(data),
-                            Err(_) => None
-                        }
-                    })
-                    .collect::<Vec<ShareData>>());
+                return Ok(data_array.clone());
             }
         }
 
         Ok(vec![])
     }
 
-    fn get_data_key(&self, data: &ShareData) -> String {
-        match data {
-            ShareData::Session { .. } => "session".to_string(),
-            ShareData::Message { data } => {
-                if let Some(msg_id) = data.get("id").and_then(|v| v.as_str()) {
-                    format!("message/{}", msg_id)
-                } else {
-                    "message/unknown".to_string()
-                }
-            }
-            ShareData::Part { data } => {
-                let msg_id = data.get("messageID").and_then(|v| v.as_str()).unwrap_or("unknown");
-                let part_id = data.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-                format!("{}/{}", msg_id, part_id)
-            }
-            ShareData::SessionDiff { .. } => "session_diff".to_string(),
-            ShareData::Model { .. } => "model".to_string(),
+    /// Extract the merge key from a data item.
+    /// Uses `_key` field if provided by client, otherwise generates a unique key.
+    fn get_data_key(&self, data: &Value) -> String {
+        if let Some(key) = data.get("_key").and_then(|v| v.as_str()) {
+            key.to_string()
+        } else {
+            // Generate a unique key for items without _key (treat as append-only)
+            format!("{}/{}", DEFAULT_KEY_PREFIX, uuid::Uuid::new_v4())
         }
     }
 
-    fn merge_data(&self, result: &mut Vec<ShareData>, item: ShareData, key: &str) {
+    /// Merge an item into the result array based on its key.
+    /// If an item with the same key exists, it will be replaced; otherwise appended.
+    fn merge_data(&self, result: &mut Vec<Value>, item: Value, key: &str) {
         // Simple linear search and replace/insert
-        if let Some(index) = result.iter().position(|existing| self.get_data_key(existing) == key) {
+        if let Some(index) = result.iter().position(|existing| {
+            self.get_data_key(existing) == key
+        }) {
             result[index] = item;
         } else {
             result.push(item);

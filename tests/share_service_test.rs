@@ -1,7 +1,6 @@
 // Integration tests for ShareService
 
 use opencode_share::core::share::ShareService;
-use opencode_share::models::ShareData;
 use serde_json::json;
 use sqlx::PgPool;
 use std::env;
@@ -192,14 +191,19 @@ async fn test_sync_share_data() {
         .await
         .expect("Failed to create share");
 
-    // Create test data to sync
+    // Create test data to sync (now using arbitrary JSON with _key field)
     let test_data = vec![
-        ShareData::Session {
-            data: json!({"model": "gpt-4", "messages": []}),
-        },
-        ShareData::Message {
-            data: json!({"id": "msg-1", "role": "user", "content": "Hello"}),
-        },
+        json!({
+            "_key": "session",
+            "model": "gpt-4",
+            "messages": []
+        }),
+        json!({
+            "_key": "message/msg-1",
+            "id": "msg-1",
+            "role": "user",
+            "content": "Hello"
+        }),
     ];
 
     // Sync data to share
@@ -233,9 +237,10 @@ async fn test_sync_with_invalid_secret() {
         .expect("Failed to create share");
 
     // Try to sync with invalid secret
-    let test_data = vec![ShareData::Session {
-        data: json!({"model": "gpt-4"}),
-    }];
+    let test_data = vec![json!({
+        "_key": "session",
+        "model": "gpt-4"
+    })];
 
     let result = service.sync(&session_id, "invalid-secret", test_data).await;
 
@@ -260,12 +265,17 @@ async fn test_get_share_data() {
 
     // Sync some data
     let test_data = vec![
-        ShareData::Session {
-            data: json!({"model": "gpt-4", "messages": []}),
-        },
-        ShareData::Message {
-            data: json!({"id": "msg-1", "role": "user", "content": "Test message"}),
-        },
+        json!({
+            "_key": "session",
+            "model": "gpt-4",
+            "messages": []
+        }),
+        json!({
+            "_key": "message/msg-1",
+            "id": "msg-1",
+            "role": "user",
+            "content": "Test message"
+        }),
     ];
 
     service
@@ -281,21 +291,15 @@ async fn test_get_share_data() {
 
     assert_eq!(retrieved_data.len(), 2);
 
-    // Verify the data types
-    match &retrieved_data[0] {
-        ShareData::Session { data } => {
-            assert_eq!(data.get("model").and_then(|v| v.as_str()), Some("gpt-4"));
-        }
-        _ => panic!("Expected Session data"),
-    }
+    // Verify the data structure
+    let session_data = &retrieved_data[0];
+    assert_eq!(session_data.get("_key").and_then(|v| v.as_str()), Some("session"));
+    assert_eq!(session_data.get("model").and_then(|v| v.as_str()), Some("gpt-4"));
 
-    match &retrieved_data[1] {
-        ShareData::Message { data } => {
-            assert_eq!(data.get("id").and_then(|v| v.as_str()), Some("msg-1"));
-            assert_eq!(data.get("content").and_then(|v| v.as_str()), Some("Test message"));
-        }
-        _ => panic!("Expected Message data"),
-    }
+    let message_data = &retrieved_data[1];
+    assert_eq!(message_data.get("_key").and_then(|v| v.as_str()), Some("message/msg-1"));
+    assert_eq!(message_data.get("id").and_then(|v| v.as_str()), Some("msg-1"));
+    assert_eq!(message_data.get("content").and_then(|v| v.as_str()), Some("Test message"));
 }
 
 #[tokio::test]
@@ -314,9 +318,11 @@ async fn test_merge_data_same_key() {
         .expect("Failed to create share");
 
     // Sync initial data
-    let initial_data = vec![ShareData::Session {
-        data: json!({"model": "gpt-3.5", "messages": []}),
-    }];
+    let initial_data = vec![json!({
+        "_key": "session",
+        "model": "gpt-3.5",
+        "messages": []
+    })];
 
     service
         .sync(&session_id, &created_share.secret, initial_data)
@@ -324,9 +330,12 @@ async fn test_merge_data_same_key() {
         .expect("Failed to sync initial data");
 
     // Sync updated data with same key
-    let updated_data = vec![ShareData::Session {
-        data: json!({"model": "gpt-4", "messages": [], "temperature": 0.7}),
-    }];
+    let updated_data = vec![json!({
+        "_key": "session",
+        "model": "gpt-4",
+        "messages": [],
+        "temperature": 0.7
+    })];
 
     service
         .sync(&session_id, &created_share.secret, updated_data)
@@ -339,15 +348,12 @@ async fn test_merge_data_same_key() {
         .await
         .expect("Failed to get data");
 
-    assert_eq!(retrieved_data.len(), 1); // Should still be only 1 Session
+    assert_eq!(retrieved_data.len(), 1); // Should still be only 1 session
 
-    match &retrieved_data[0] {
-        ShareData::Session { data } => {
-            assert_eq!(data.get("model").and_then(|v| v.as_str()), Some("gpt-4"));
-            assert_eq!(data.get("temperature").and_then(|v| v.as_f64()), Some(0.7));
-        }
-        _ => panic!("Expected Session data"),
-    }
+    let session_data = &retrieved_data[0];
+    assert_eq!(session_data.get("_key").and_then(|v| v.as_str()), Some("session"));
+    assert_eq!(session_data.get("model").and_then(|v| v.as_str()), Some("gpt-4"));
+    assert_eq!(session_data.get("temperature").and_then(|v| v.as_f64()), Some(0.7));
 }
 
 #[tokio::test]

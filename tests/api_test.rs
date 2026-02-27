@@ -176,17 +176,20 @@ async fn test_sync_share_endpoint() {
     let share_id = create_json["id"].as_str().unwrap();
     let secret = create_json["secret"].as_str().unwrap();
 
-    // Now sync data to the share
+    // Now sync data to the share (using arbitrary JSON with _key field)
     let sync_data = json!({
         "secret": secret,
         "data": [
             {
-                "type": "session",
-                "data": {"model": "gpt-4", "messages": []}
+                "_key": "session",
+                "model": "gpt-4",
+                "messages": []
             },
             {
-                "type": "message",
-                "data": {"id": "msg-1", "role": "user", "content": "Hello"}
+                "_key": "message/msg-1",
+                "id": "msg-1",
+                "role": "user",
+                "content": "Hello"
             }
         ]
     });
@@ -239,13 +242,13 @@ async fn test_sync_share_with_invalid_secret() {
 
     let share_id = create_json["id"].as_str().unwrap();
 
-    // Try to sync with invalid secret
+    // Try to sync with invalid secret (using arbitrary JSON with _key field)
     let sync_data = json!({
         "secret": "invalid-secret",
         "data": [
             {
-                "type": "session",
-                "data": {"model": "gpt-4"}
+                "_key": "session",
+                "model": "gpt-4"
             }
         ]
     });
@@ -299,13 +302,14 @@ async fn test_get_share_data_endpoint() {
     let share_id = create_json["id"].as_str().unwrap();
     let secret = create_json["secret"].as_str().unwrap();
 
-    // Sync some data
+    // Sync some data (using arbitrary JSON with _key field)
     let sync_data = json!({
         "secret": secret,
         "data": [
             {
-                "type": "session",
-                "data": {"model": "gpt-4", "messages": []}
+                "_key": "session",
+                "model": "gpt-4",
+                "messages": []
             }
         ]
     });
@@ -345,10 +349,12 @@ async fn test_get_share_data_endpoint() {
     let response_json: serde_json::Value = serde_json::from_slice(&body)
         .expect("Failed to parse JSON");
 
-    assert!(response_json["data"].is_array());
-    let data_array = response_json["data"].as_array().unwrap();
+    // Response is now a direct array of ShareData items
+    assert!(response_json.is_array());
+    let data_array = response_json.as_array().unwrap();
     assert_eq!(data_array.len(), 1);
-    assert_eq!(data_array[0]["type"], "session");
+    // Verify the data contains the _key field we set
+    assert_eq!(data_array[0]["_key"], "session");
 }
 
 #[tokio::test]

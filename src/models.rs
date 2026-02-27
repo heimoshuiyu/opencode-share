@@ -12,28 +12,21 @@ pub struct Share {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShareEvent {
-    pub event_key: String,
-    #[serde(flatten)]
-    pub data: ShareData,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum ShareData {
-    #[serde(rename = "session")]
-    Session { data: Value },
-    #[serde(rename = "message")]
-    Message { data: Value },
-    #[serde(rename = "part")]
-    Part { data: Value },
-    #[serde(rename = "session_diff")]
-    SessionDiff { data: Value },
-    #[serde(rename = "model")]
-    Model { data: Value },
-}
+/// ShareData is now an arbitrary JSON value.
+/// Clients should include a `_key` field to identify how data should be merged.
+/// Optional `_type` field can be used by clients for their own type identification.
+///
+/// Example:
+/// ```json
+/// {
+///   "_key": "session",
+///   "_type": "session",
+///   "id": "xxx",
+///   "title": "...",
+///   ... // any other fields
+/// }
+/// ```
+pub type ShareData = Value;
 
 // Create share request
 #[derive(Debug, Deserialize)]

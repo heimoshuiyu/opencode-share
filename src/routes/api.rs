@@ -5,13 +5,12 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
+use serde_json::Value;
 use tracing::{debug, error, info};
 
 use crate::{
     core::share::ShareService,
-    models::{
-        CreateShareRequest, CreateShareResponse, RemoveShareRequest, SyncShareRequest, ShareData,
-    },
+    models::{CreateShareRequest, CreateShareResponse, RemoveShareRequest, SyncShareRequest},
     AppState,
 };
 
@@ -119,7 +118,7 @@ pub async fn sync_share(
 pub async fn get_share_data(
     State(state): State<AppState>,
     Path(share_id): Path<String>,
-) -> Result<Json<Vec<ShareData>>, StatusCode> {
+) -> Result<Json<Vec<Value>>, StatusCode> {
     // Removed client IP extraction
     
     info!(
