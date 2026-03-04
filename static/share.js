@@ -255,7 +255,7 @@ class ShareRenderer {
       result += `<div class="tool-label">Output`;
 
       if (isLongOutput) {
-        result += `<button class="tool-expand-btn" onclick="this.closest('.tool-output').classList.toggle('expanded')">`;
+        result += `<button class="tool-expand-btn" data-tool-id="${toolId}">`;
         result += `<span class="expand-text">Show full output (${outputLines} lines)</span>`;
         result += `<span class="collapse-text">Show less</span>`;
         result += `</button>`;
@@ -604,6 +604,18 @@ class ShareRenderer {
     messageElements.forEach(element => {
       element.addEventListener('click', () => {
         // Handle message selection if needed
+      });
+    });
+
+    // Add event listeners for tool expand buttons
+    const expandButtons = document.querySelectorAll('.tool-expand-btn');
+    expandButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const toolOutput = button.closest('.tool-output');
+        if (toolOutput) {
+          toolOutput.classList.toggle('expanded');
+        }
       });
     });
 
